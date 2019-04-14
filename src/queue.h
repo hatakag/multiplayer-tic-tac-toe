@@ -1,7 +1,7 @@
 #include "server.h"
-#define MaxQ 50
+#define MaxQ 2
 
-typedef ClientNode EltypeQ;
+typedef ClientNode* EltypeQ;
 typedef struct nodeQ nodeQ;
 struct nodeQ {
   EltypeQ elQ;
