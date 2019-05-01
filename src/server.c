@@ -7,10 +7,13 @@
 #include <signal.h>
 #include "server.h"
 #include "queue.h"
+#include "Tic-Tac-Toe_Lib.h"
 
 #define MAXLINE 4096 /*max text line length*/
 #define SERV_PORT 3000 /*port*/
 #define LISTENQ 8 /*maximum number of client connections */
+
+#define STRING_LENGTH 31
 
 #define LOGIN "LOGIN"
 #define JOIN "JOIN"
@@ -130,6 +133,20 @@ void sendPosMsg(int sockfd, int x, int y) {
 	send(sockfd, buf, len+1, 0);
 }
 
+void checkUsernamePassword(char* username, char* password) {
+	FILE * fp = fopen("user.txt", "r");
+	char name[STRING_LENGTH], pass[STRING_LENGTH];
+	int check = 0;
+	while (!feof(fp)) {
+		fscanf(fp, "%s%*c%s%*c", name, pass);
+		if (strcmp(username, name) == 0 && strcmp(password, pass) == 0)
+			check = 1;
+	}
+	fclose(fp);
+	if (check == 1) return true;
+	else return false;
+}
+
 void handleLoginReq(ClientNode* clinode, char* username, char* password) {
 	if (checkUsernamePassword(username, password)) {
 		strcpy(clinode->name, username);
@@ -148,13 +165,17 @@ void handleJoinReq(ClientNode* clinode, Queue playerQueue) {
 		deQueue(&playerQueue);
 		sendOKMsg(clinode->sockfd, JOIN, "match found");
 		sendOKMsg(opponent->sockfd, JOIN, "match found");
+		clinode->mark = 'X';
+		opponent->mark = 'O';
 	}
 }
 
 void handlePosReq(ClientNode* clinode,int x, int y) {
-	if (checkMarkPosition(clinode->board, x, y)) {
+	if (checkMarkPosition(x, y) && !isMark(clinode->board, x, y)) {
 		sendPosMsg(clinode->opponent->sockfd, x, y);
 		sendOKMsg(clinode->sockfd, POS, "valid mark position")
+		clinode->board[x][y] = clinode->mark;
+		clinode->opponent->board[x][y] = clinode->mark;
 	} else {
 		sendFailMsg(clinode->sockfd, POS, "invalid mark position")
 	}
@@ -171,6 +192,8 @@ void handlePosReq(ClientNode* clinode,int x, int y) {
 
 void handleQuitReq(ClientNode* clinode) {
 	//delete client data
+	printf("Delete data of client %s\n", clinode->sockfd);
+	free(clinode);
 }
 
 void handleClient(int connfd) {
@@ -180,26 +203,28 @@ void handleClient(int connfd) {
   	ClientNode* clinode = newNode(connfd, ip);
 
   	while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)  {
-      	/*
-      	split(buf, ' ');
-      	switch () {
-      		case :
-      			handleLoginReq(clinode, username, password);
-      			break;
-      		case :	
-      			handleJoinReq(clinode, playerQueue);
-      			break;
-      		case :
-      			handlePosReq(clinode, x, y);
-      			break;
-      		case :
-      			handleQuitReq(clinode);
-      			break;
-      		default:
-      			printf("%s\n", "Invalid request");
-      			break;
+
+  		int i = 0;
+	    char *p = strtok (buf, " ");
+	    char *token[3];
+	    while (p != NULL)
+	    {
+	        token[i++] = p;
+	        p = strtok (NULL, " ");
+	    }
+
+      	if (strcmp(token[0], LOGIN) == 0) {
+      		handleLoginReq(clinode, token[1], token[2]);
+      	} else if (strcmp(token[0], JOIN) == 0) {
+      		handleJoinReq(clinode, playerQueue);
+      	} else if (strcmp(token[0], POS) == 0) {
+      		handlePosReq(clinode, atoi(token[1]), atoi(token[2]));
+      	} else if (strcmp(token[0], QUIT) == 0) {
+      		handleQuitReq(clinode);
+      		close(connfd);
+      	} else {
+      		printf("%s\n", "Bad request");
       	}
-      	*/
     }
 
     if (n < 0) {

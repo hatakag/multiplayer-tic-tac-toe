@@ -20,10 +20,10 @@ void readFromFile(FILE * fp);
 void enterPlayerName(int num_players, char playerName[][STRING_SIZE]);
 
 // check mark position return true if right, return false if wrong
-bool checkMarkPosition(int markAt);
+bool checkMarkPosition(int x, int y);
 
 // check position is marked return true if it is marked, return false if not
-bool isMark(int markAt, char square[][3]);
+bool isMark(char square[][3], int x, int y);
 
 // play game, print winner and save steps to file
 void playGame(char playerName[][STRING_SIZE], FILE *savefile);
