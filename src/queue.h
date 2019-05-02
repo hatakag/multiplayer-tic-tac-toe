@@ -64,7 +64,7 @@ EltypeQ deQueue(Queue *q) {
   }
   else printf("Queue is empty!\n");
 }
-
+/*
 void printQueue(Queue q) {
   nodeQ *c=q.front;
   while (c!=NULL) {
@@ -72,3 +72,4 @@ void printQueue(Queue q) {
     c=c->nextQ;
   }
 }
+*/

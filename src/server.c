@@ -5,8 +5,9 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <signal.h>
-#include "server.h"
+#include <stdbool.h>
 #include "queue.h"
+#include "server.h"
 #include "Tic-Tac-Toe_Lib.h"
 
 #define MAXLINE 4096 /*max text line length*/
@@ -82,8 +83,43 @@ int main (int argc, char **argv)
     		//close listening socket
     		close (listenfd);
 
-    		handleClient(connfd);
+    		//
+		char *ip = NULL;
+		ip = malloc(INET_ADDRSTRLEN);
+		inet_ntop(AF_INET, &(cliaddr.sin_addr), ip, INET_ADDRSTRLEN);
+		ClientNode* clinode = newNode(connfd, ip);
+	
+		while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)  {
 
+		  int i = 0;
+		  char *p = strtok (buf, " ");
+		  char *token[3];
+		  while (p != NULL)
+		    {
+		      token[i++] = p;
+		      p = strtok (NULL, " ");
+		    }
+		  
+		  if (strcmp(token[0], LOGIN) == 0) {
+		    handleLoginReq(clinode, token[1], token[2]);
+		  } else if (strcmp(token[0], JOIN) == 0) {
+		    handleJoinReq(clinode, playerQueue);
+		  } else if (strcmp(token[0], POS) == 0) {
+		    handlePosReq(clinode, atoi(token[1]), atoi(token[2]));
+		  } else if (strcmp(token[0], QUIT) == 0) {
+		    handleQuitReq(clinode);
+		    close(connfd);
+		  } else {
+		    printf("%s\n", "Bad request");
+		  }
+		}
+
+		if (n < 0) {
+		  printf("%s\n", "Read error");
+		  exit(0);
+		}
+		//
+		
    		}
    		signal(SIGCHLD,sig_chld);
    		close(connfd);
@@ -94,11 +130,11 @@ int main (int argc, char **argv)
 void sendOKMsg(int sockfd, char* req, char* msg) {
 	int len = strlen(req) + strlen(msg) + strlen(OK) + 2;
 	char *buf = (char*)malloc(sizeof(char)*(len+1));
-	strcpy(buf, OK)
-	strcat(buf, " ")
-	strcat(buf, req)
-	strcat(buf, " ")
-	strcat(buf, msg)
+	strcpy(buf, OK);
+	strcat(buf, " ");
+	strcat(buf, req);
+	strcat(buf, " ");
+	strcat(buf, msg);
 	buf[len] = '\0';
 	send(sockfd, buf, len+1, 0);
 }
@@ -106,34 +142,36 @@ void sendOKMsg(int sockfd, char* req, char* msg) {
 void sendFailMsg(int sockfd, char* req, char* msg) {
 	int len = strlen(req) + strlen(msg) + strlen(FAIL) + 2;
 	char *buf = (char*)malloc(sizeof(char)*(len+1));
-	strcpy(buf, FAIL)
-	strcat(buf, " ")
-	strcat(buf, req)
-	strcat(buf, " ")
-	strcat(buf, msg)
+	strcpy(buf, FAIL);
+	strcat(buf, " ");
+	strcat(buf, req);
+	strcat(buf, " ");
+	strcat(buf, msg);
 	buf[len] = '\0';
 	send(sockfd, buf, len+1, 0);
 }
 
 void sendPosMsg(int sockfd, int x, int y) {
-	char xlen = (int)((ceil(log10(x))+1)*sizeof(char))
-	char ylen = (int)((ceil(log10(y))+1)*sizeof(char))
-	char xstr[xlen];
-	char ystr[ylen];
-	sprintf(xstr, "%d", x);
-	sprintf(ystr, "%d", y);
-	int len = strlen(POS) + 2 + xlen-1 + ylen-1;
-	char *buf = (char*)malloc(sizeof(char)*(len+1));
-	strcpy(buf, POS)
-	strcat(buf, " ")
-	strcat(buf, xstr)
-	strcat(buf, " ")
-	strcat(buf, ystr)
-	buf[len] = '\0';
-	send(sockfd, buf, len+1, 0);
+  int xlen, ylen; 
+  xlen = snprintf(NULL, 0, "%d", x);
+  ylen = snprintf(NULL, 0, "%d", y);
+  char *xstr, *ystr;
+  xstr = (char*)malloc((xlen+1)*sizeof(char));
+  ystr = (char*)malloc((ylen+1)*sizeof(char));
+  snprintf(xstr, xlen+1, "%d", x);
+  snprintf(ystr, ylen+1, "%d", y);
+  int len = strlen(POS) + 2 + xlen + ylen;
+  char *buf = (char*)malloc(sizeof(char)*(len+1));
+  strcpy(buf, POS);
+  strcat(buf, " ");
+  strcat(buf, xstr);
+  strcat(buf, " ");
+  strcat(buf, ystr);
+  buf[len] = '\0';
+  send(sockfd, buf, len+1, 0);
 }
 
-void checkUsernamePassword(char* username, char* password) {
+bool checkUsernamePassword(char* username, char* password) {
 	FILE * fp = fopen("user.txt", "r");
 	char name[STRING_LENGTH], pass[STRING_LENGTH];
 	int check = 0;
@@ -173,11 +211,11 @@ void handleJoinReq(ClientNode* clinode, Queue playerQueue) {
 void handlePosReq(ClientNode* clinode,int x, int y) {
 	if (checkMarkPosition(x, y) && !isMark(clinode->board, x, y)) {
 		sendPosMsg(clinode->opponent->sockfd, x, y);
-		sendOKMsg(clinode->sockfd, POS, "valid mark position")
+		sendOKMsg(clinode->sockfd, POS, "valid mark position");
 		clinode->board[x][y] = clinode->mark;
 		clinode->opponent->board[x][y] = clinode->mark;
 	} else {
-		sendFailMsg(clinode->sockfd, POS, "invalid mark position")
+	  sendFailMsg(clinode->sockfd, POS, "invalid mark position");
 	}
 	if (checkWin(clinode->board)==1 || checkWin(clinode->board)==-1) {
 		int i,j;
@@ -192,43 +230,6 @@ void handlePosReq(ClientNode* clinode,int x, int y) {
 
 void handleQuitReq(ClientNode* clinode) {
 	//delete client data
-	printf("Delete data of client %s\n", clinode->sockfd);
+	printf("Delete data of client %d\n", clinode->sockfd);
 	free(clinode);
-}
-
-void handleClient(int connfd) {
-	char *ip = NULL;
-   	ip = malloc(INET_ADDRSTRLEN);
-   	inet_ntop(AF_INET, &(cliaddr.sin_addr), ip, INET_ADDRSTRLEN);
-  	ClientNode* clinode = newNode(connfd, ip);
-
-  	while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)  {
-
-  		int i = 0;
-	    char *p = strtok (buf, " ");
-	    char *token[3];
-	    while (p != NULL)
-	    {
-	        token[i++] = p;
-	        p = strtok (NULL, " ");
-	    }
-
-      	if (strcmp(token[0], LOGIN) == 0) {
-      		handleLoginReq(clinode, token[1], token[2]);
-      	} else if (strcmp(token[0], JOIN) == 0) {
-      		handleJoinReq(clinode, playerQueue);
-      	} else if (strcmp(token[0], POS) == 0) {
-      		handlePosReq(clinode, atoi(token[1]), atoi(token[2]));
-      	} else if (strcmp(token[0], QUIT) == 0) {
-      		handleQuitReq(clinode);
-      		close(connfd);
-      	} else {
-      		printf("%s\n", "Bad request");
-      	}
-    }
-
-    if (n < 0) {
-      	printf("%s\n", "Read error");
-    	exit(0);
-	}
 }
