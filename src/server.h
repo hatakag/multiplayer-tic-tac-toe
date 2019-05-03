@@ -35,13 +35,4 @@ void freeNode(ClientNode* n) {
     free(n);
 }
 
-void sendOKMsg(int sockfd, char* req, char* msg);
-void sendFailMsg(int sockfd, char* req, char* msg);
-void sendPosMsg(int sockfd, int x, int y);
-bool checkUsernamePassword(char* username, char* password);
-void handleLoginReq(ClientNode* clinode, char* username, char* password);
-void handleJoinReq(ClientNode* clinode, Queue playerQueue);
-void handlePosReq(ClientNode* clinode,int x, int y);
-void handleQuitReq(ClientNode* clinode);
-
 #endif // SERVER_H
