@@ -2,6 +2,7 @@
 #define TIC_TAC_TOE_LIB_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #define STRING_SIZE 50
 
 // print board
