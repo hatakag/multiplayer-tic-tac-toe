@@ -62,7 +62,10 @@ EltypeQ deQueue(Queue *q) {
     free(t);
     return x;
   }
-  else printf("Queue is empty!\n");
+  else {
+    printf("Queue is empty!\n");
+    return NULL;
+  }
 }
 /*
 void printQueue(Queue q) {

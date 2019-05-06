@@ -3,9 +3,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/wait.h>
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 #include "queue.h"
 #include "server.h"
 #include "Tic-Tac-Toe_Lib.h"
@@ -29,7 +32,7 @@ void sig_chld(int signo)
   pid_t pid;
   int stat;
   while ( (pid = waitpid(-1, &stat, WNOHANG)) > 0)
-    printf("child %d terminated\n", pid);
+    printf("child %d terminated, status %d\n", pid, stat);
   return;
 }
 /*
@@ -48,6 +51,7 @@ void sendOKMsg(int sockfd, char* req, char* msg) {
   strcat(buf, msg);
   buf[len] = '\0';
   send(sockfd, buf, len+1, 0);
+  free(buf);
 }
 
 void sendFailMsg(int sockfd, char* req, char* msg) {
@@ -60,6 +64,7 @@ void sendFailMsg(int sockfd, char* req, char* msg) {
   strcat(buf, msg);
   buf[len] = '\0';
   send(sockfd, buf, len+1, 0);
+  free(buf);
 }
 
 void sendPosMsg(int sockfd, int x, int y) {
@@ -80,18 +85,22 @@ void sendPosMsg(int sockfd, int x, int y) {
   strcat(buf, ystr);
   buf[len] = '\0';
   send(sockfd, buf, len+1, 0);
+  free(buf);
 }
 
 bool checkUsernamePassword(char* username, char* password) {
-  FILE * fp = fopen("user.txt", "r");
-  char name[STRING_LENGTH], pass[STRING_LENGTH];
+  FILE * fp = fopen("src/user.txt", "r");
+  char *name = (char*)malloc(STRING_LENGTH*sizeof(char));
+  char *pass = (char*)malloc(STRING_LENGTH*sizeof(char));
   int check = 0;
   while (!feof(fp)) {
-    fscanf(fp, "%s%*c%s%*c", name, pass);
+    fscanf(fp, "%s%*c%s%*c", name, pass);__fpurge(stdin);
     if (strcmp(username, name) == 0 && strcmp(password, pass) == 0)
       check = 1;
   }
   fclose(fp);
+  free(name);
+  free(pass);
   if (check == 1) return true;
   else return false;
 }
@@ -99,8 +108,10 @@ bool checkUsernamePassword(char* username, char* password) {
 void handleLoginReq(ClientNode* clinode, char* username, char* password) {
   if (checkUsernamePassword(username, password)) {
     strcpy(clinode->name, username);
+    printf("Send OK LOGIN msg %s %s\n", username, password);
     sendOKMsg(clinode->sockfd, LOGIN, "login successfully");
   } else {
+    printf("Send FAIL LOGIN msg %s %s\n", username, password);
     sendFailMsg(clinode->sockfd, LOGIN, "login fail");
   }
 }
@@ -112,6 +123,7 @@ void handleJoinReq(ClientNode* clinode, Queue playerQueue) {
     opponent->opponent = clinode;
     clinode->opponent = opponent;
     deQueue(&playerQueue);
+    printf("Send OK JOIN msg %d %d\n", clinode->sockfd, opponent->sockfd);
     sendOKMsg(clinode->sockfd, JOIN, "match found");
     sendOKMsg(opponent->sockfd, JOIN, "match found");
     clinode->mark = 'X';
@@ -121,11 +133,13 @@ void handleJoinReq(ClientNode* clinode, Queue playerQueue) {
 
 void handlePosReq(ClientNode* clinode,int x, int y) {
   if (checkMarkPosition(x, y) && !isMark(clinode->board, x, y)) {
+    printf("Send OK POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
     sendPosMsg(clinode->opponent->sockfd, x, y);
     sendOKMsg(clinode->sockfd, POS, "valid mark position");
     clinode->board[x][y] = clinode->mark;
     clinode->opponent->board[x][y] = clinode->mark;
   } else {
+    printf("Send FAIL POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
     sendFailMsg(clinode->sockfd, POS, "invalid mark position");
   }
   if (checkWin(clinode->board)==1 || checkWin(clinode->board)==-1) {
@@ -198,7 +212,7 @@ int main (int argc, char **argv)
       ClientNode* clinode = newNode(connfd, ip);
 	
       while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)  {
-
+	printf("\{%s\}", buf);
 	int i = 0;
 	char *p = strtok (buf, " ");
 	char *token[3];
@@ -209,12 +223,16 @@ int main (int argc, char **argv)
 	  }
 		  
 	if (strcmp(token[0], LOGIN) == 0) {
+	  printf("Handle request: LOGIN %s %s\n", token[1], token[2]);
 	  handleLoginReq(clinode, token[1], token[2]);
 	} else if (strcmp(token[0], JOIN) == 0) {
+	  printf("Handle request: JOIN\n");
 	  handleJoinReq(clinode, playerQueue);
 	} else if (strcmp(token[0], POS) == 0) {
+	  printf("Handle request: POS %d %d\n", atoi(token[1]), atoi(token[2]));
 	  handlePosReq(clinode, atoi(token[1]), atoi(token[2]));
 	} else if (strcmp(token[0], QUIT) == 0) {
+	  printf("Handle request: QUIT\n");
 	  handleQuitReq(clinode);
 	  close(connfd);
 	} else {
@@ -229,7 +247,7 @@ int main (int argc, char **argv)
       //
 		
     }
-    signal(SIGCHLD,sig_chld);
+    signal(SIGCHLD,sig_chld);//Handle terminate child process
     close(connfd);
   }
 }
