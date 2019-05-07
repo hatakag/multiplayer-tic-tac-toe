@@ -106,23 +106,29 @@ bool checkUsernamePassword(char* username, char* password) {
 }
 
 void handleLoginReq(ClientNode* clinode, char* username, char* password) {
+  if (username == NULL || password == NULL) {
+    sendFailMsg(clinode->sockfd, LOGIN, "login fail - invalid username & password");
+    return;
+  }
   if (checkUsernamePassword(username, password)) {
     strcpy(clinode->name, username);
     printf("Send OK LOGIN msg %s %s\n", username, password);
     sendOKMsg(clinode->sockfd, LOGIN, "login successfully");
   } else {
     printf("Send FAIL LOGIN msg %s %s\n", username, password);
-    sendFailMsg(clinode->sockfd, LOGIN, "login fail");
+    sendFailMsg(clinode->sockfd, LOGIN, "login fail - wrong username & password");
   }
 }
 
-void handleJoinReq(ClientNode* clinode, Queue playerQueue) {
-  enQueue(clinode, &playerQueue);
-  if (fullQueue(playerQueue)) {
-    ClientNode* opponent = deQueue(&playerQueue);
+void handleJoinReq(ClientNode* clinode, Queue *playerQueue) {
+  enQueue(clinode, playerQueue);
+  printf("%d\n", clinode->sockfd);
+  printQueue(*playerQueue);
+  if (fullQueue(*playerQueue)) {
+    ClientNode* opponent = deQueue(playerQueue);
     opponent->opponent = clinode;
     clinode->opponent = opponent;
-    deQueue(&playerQueue);
+    deQueue(playerQueue);
     printf("Send OK JOIN msg %d %d\n", clinode->sockfd, opponent->sockfd);
     sendOKMsg(clinode->sockfd, JOIN, "match found");
     sendOKMsg(opponent->sockfd, JOIN, "match found");
@@ -169,6 +175,7 @@ int main (int argc, char **argv)
   struct sockaddr_in cliaddr, servaddr;
 
   Queue playerQueue;
+  makeNullQueue(&playerQueue);
   
   //Create a socket for the soclet
   //If sockfd<0 there was an error in the creation of the socket
@@ -227,7 +234,7 @@ int main (int argc, char **argv)
 	  handleLoginReq(clinode, token[1], token[2]);
 	} else if (strcmp(token[0], JOIN) == 0) {
 	  printf("Handle request: JOIN\n");
-	  handleJoinReq(clinode, playerQueue);
+	  handleJoinReq(clinode, &playerQueue);
 	} else if (strcmp(token[0], POS) == 0) {
 	  printf("Handle request: POS %d %d\n", atoi(token[1]), atoi(token[2]));
 	  handlePosReq(clinode, atoi(token[1]), atoi(token[2]));

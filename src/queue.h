@@ -67,12 +67,11 @@ EltypeQ deQueue(Queue *q) {
     return NULL;
   }
 }
-/*
+
 void printQueue(Queue q) {
   nodeQ *c=q.front;
   while (c!=NULL) {
-    printf("%d",c->elQ);
+    printNode(c->elQ);
     c=c->nextQ;
   }
 }
-*/
