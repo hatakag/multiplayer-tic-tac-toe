@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 #include "queue.h"
 #include "server.h"
 #include "Tic-Tac-Toe_Lib.h"
@@ -26,6 +27,8 @@
 #define OK "OK"
 #define FAIL "FAIL"
 #define BOARD_SIZE 3
+
+Queue playerQueue;
 
 void sig_chld(int signo)
 {
@@ -165,6 +168,45 @@ void handleQuitReq(ClientNode* clinode) {
   free(clinode);
 }
 
+void handleClient(void* c) {
+	int n;
+	char buf[MAXLINE];
+	ClientNode* clinode = (ClientNode*) c;
+	printf("%d\n", clinode->sockfd);
+	while ( (n = recv(clinode->sockfd, buf, MAXLINE,0)) > 0)  {
+		printf("\{%s\}", buf);
+		int i = 0;
+		char *p = strtok (buf, " ");
+		char *token[3];
+		while (p != NULL)
+		  {
+		    token[i++] = p;
+		    p = strtok (NULL, " ");
+		  }
+			  
+		if (strcmp(token[0], LOGIN) == 0) {
+		  printf("Handle request: LOGIN %s %s\n", token[1], token[2]);
+		  handleLoginReq(clinode, token[1], token[2]);
+		} else if (strcmp(token[0], JOIN) == 0) {
+		  printf("Handle request: JOIN\n");
+		  handleJoinReq(clinode, &playerQueue);
+		} else if (strcmp(token[0], POS) == 0) {
+		  printf("Handle request: POS %d %d\n", atoi(token[1]), atoi(token[2]));
+		  handlePosReq(clinode, atoi(token[1]), atoi(token[2]));
+		} else if (strcmp(token[0], QUIT) == 0) {
+		  printf("Handle request: QUIT\n");
+		  handleQuitReq(clinode);
+		  close(clinode->sockfd);
+		} else {
+		  printf("%s\n", "Bad request");
+		}
+    }
+
+    if (n < 0) {
+		printf("%s\n", "Read error");
+		exit(0);
+	}
+}
 
 int main (int argc, char **argv)
 {
@@ -174,7 +216,7 @@ int main (int argc, char **argv)
   char buf[MAXLINE];
   struct sockaddr_in cliaddr, servaddr;
 
-  Queue playerQueue;
+  //Queue playerQueue;
   makeNullQueue(&playerQueue);
   
   //Create a socket for the soclet
@@ -202,59 +244,23 @@ int main (int argc, char **argv)
     clilen = sizeof(cliaddr);
     //accept a connection
     connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
+    printf("%d\n", connfd);
   
     printf("%s\n","Received request...");
 
-    if ( (childpid = fork ()) == 0 ) {//if it’s 0, it’s child process
+	char *ip = NULL;
+	ip = malloc(INET_ADDRSTRLEN);
+	inet_ntop(AF_INET, &(cliaddr.sin_addr), ip, INET_ADDRSTRLEN);
+	ClientNode* clinode = newNode(connfd, ip);
 
-      printf ("%s\n","Child created for dealing with client requests");
-
-      //close listening socket
-      close (listenfd);
-
-      //
-      char *ip = NULL;
-      ip = malloc(INET_ADDRSTRLEN);
-      inet_ntop(AF_INET, &(cliaddr.sin_addr), ip, INET_ADDRSTRLEN);
-      ClientNode* clinode = newNode(connfd, ip);
-	
-      while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)  {
-	printf("\{%s\}", buf);
-	int i = 0;
-	char *p = strtok (buf, " ");
-	char *token[3];
-	while (p != NULL)
-	  {
-	    token[i++] = p;
-	    p = strtok (NULL, " ");
-	  }
-		  
-	if (strcmp(token[0], LOGIN) == 0) {
-	  printf("Handle request: LOGIN %s %s\n", token[1], token[2]);
-	  handleLoginReq(clinode, token[1], token[2]);
-	} else if (strcmp(token[0], JOIN) == 0) {
-	  printf("Handle request: JOIN\n");
-	  handleJoinReq(clinode, &playerQueue);
-	} else if (strcmp(token[0], POS) == 0) {
-	  printf("Handle request: POS %d %d\n", atoi(token[1]), atoi(token[2]));
-	  handlePosReq(clinode, atoi(token[1]), atoi(token[2]));
-	} else if (strcmp(token[0], QUIT) == 0) {
-	  printf("Handle request: QUIT\n");
-	  handleQuitReq(clinode);
-	  close(connfd);
-	} else {
-	  printf("%s\n", "Bad request");
-	}
-      }
-
-      if (n < 0) {
-	printf("%s\n", "Read error");
-	exit(0);
-      }
-      //
-		
+	printf ("%s\n","Thread created for dealing with client requests");
+	//create thread
+	pthread_t id;
+    if (pthread_create(&id, NULL, (void *)handleClient, (void *)clinode) != 0) {
+    	perror("Create pthread error!\n");
+    	exit(0);
     }
-    signal(SIGCHLD,sig_chld);//Handle terminate child process
-    close(connfd);
+
+    //close(connfd);
   }
 }

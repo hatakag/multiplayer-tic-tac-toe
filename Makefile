@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-Wall -std=gnu99
-#LIBS=-pthread
+LIBS=-pthread
 SRC=src
 
 all: server.out client.out
