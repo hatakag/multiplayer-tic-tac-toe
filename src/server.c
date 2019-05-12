@@ -201,11 +201,12 @@ void handleClient(void* c) {
 		  printf("%s\n", "Bad request");
 		}
     }
-
+    /*
     if (n < 0) {
 		printf("%s\n", "Read error");
 		exit(0);
 	}
+	*/
 }
 
 int main (int argc, char **argv)
