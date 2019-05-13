@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
+#include "define.h"
 
 #define MAXLINE 4096 /*max text line length*/
 #define SERV_PORT 3000 /*port*/
@@ -28,9 +29,16 @@ void signio_handler(int signo)
   memset(buff,0,sizeof(buff));
 }
 
+void catch_ctrl_c_and_exit(int sig) {
+  send(sockfd, QUIT, sizeof(QUIT), 0);
+  printf("Bye\n");
+  close(sockfd);
+  exit(0);
+}
+
 int main(int argc, char **argv) 
 {
-	
+	signal(SIGINT, catch_ctrl_c_and_exit);
  //int sockfd;
  struct sockaddr_in servaddr;
  char sendline[MAXLINE], recvline[MAXLINE];
@@ -72,10 +80,15 @@ int main(int argc, char **argv)
       printf("Error in setting own to socket");
 
   char str[50];
+  printf("Enter request you want to send: \n");
   while (1) {
-    printf("Client: ");
+    //printf("Client: ");
     gets(str);  
     send(sockfd, str, sizeof(str),0);
+    if (strcmp(str, QUIT) == 0) {
+      printf("Bye\n");
+      exit(0);
+    }
     memset(str,0,sizeof(str));
   }
   

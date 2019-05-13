@@ -130,10 +130,10 @@ void handleLoginReq(ClientNode* clinode, char* username, char* password) {
   if (checkUsernamePassword(username, password)) {
     strcpy(clinode->name, username);
     clinode->status = LOGGED;
-    printf("Send OK LOGIN msg %s %s\n", username, password);
+    //printf("Send OK LOGIN msg %s %s\n", username, password);
     sendOKMsg(clinode->sockfd, LOGIN, "login successfully");
   } else {
-    printf("Send FAIL LOGIN msg %s %s\n", username, password);
+    //printf("Send FAIL LOGIN msg %s %s\n", username, password);
     sendFailMsg(clinode->sockfd, LOGIN, "login fail - wrong username & password");
   }
 }
@@ -149,18 +149,18 @@ void handleJoinReq(ClientNode* clinode, Queue *playerQueue) {
   }
   enQueue(clinode, playerQueue);
   clinode->status = JOINED;
-  printf("%d\n", clinode->sockfd);
-  printQueue(*playerQueue);
+  //printf("%d\n", clinode->sockfd);
+  //printQueue(*playerQueue);
   if (fullQueue(*playerQueue)) {
     ClientNode* opponent = deQueue(playerQueue);
     opponent->opponent = clinode;
     clinode->opponent = opponent;
     deQueue(playerQueue);
-    clinode->status = MARKING;
-    opponent->status = WAITING;
+    clinode->status = WAITING;
+    opponent->status = MARKING;
     clinode->mark = 'X';
     opponent->mark = 'O';
-    printf("Send OK JOIN msg %d %d\n", clinode->sockfd, opponent->sockfd);
+    //printf("Send OK JOIN msg %d %d\n", clinode->sockfd, opponent->sockfd);
     sendOKMsg(clinode->sockfd, JOIN, "match found");
     sendOKMsg(opponent->sockfd, JOIN, "match found");
   }
@@ -192,7 +192,7 @@ void handlePosReq(ClientNode* clinode,int x, int y) {
     return;
   }
   if (checkMarkPosition(x, y) && !isMark(clinode->board, x, y)) {
-    printf("Send OK POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
+    //printf("Send OK POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
     sendPosMsg(clinode->opponent->sockfd, x, y);
     sendOKMsg(clinode->sockfd, POS, "valid mark position");
     clinode->board[x][y] = clinode->mark;
@@ -200,11 +200,14 @@ void handlePosReq(ClientNode* clinode,int x, int y) {
     clinode->status = WAITING;
     clinode->opponent->status = MARKING;
   } else {
-    printf("Send FAIL POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
+    //printf("Send FAIL POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
     sendFailMsg(clinode->sockfd, POS, "invalid mark position");
   }
-  if (checkWin(clinode->board)==1 || checkWin(clinode->board)==-1) {
+  if (checkWin(clinode->board)==1) {
     endMatch(clinode, clinode->sockfd);
+  }
+  if (checkWin(clinode->board)==-1) {
+    endMatch(clinode, -1);
   }
 }
 
@@ -221,9 +224,9 @@ void handleClient(void* c) {
 	int n;
 	char buf[MAXLINE];
 	ClientNode* clinode = (ClientNode*) c;
-	printf("%d\n", clinode->sockfd);
+	printf("Client connect at sockfd: %d\n", clinode->sockfd);
 	while ( (n = recv(clinode->sockfd, buf, MAXLINE,0)) > 0)  {
-		printf("\{%s\}", buf);
+		//printf("\{%s\}", buf);
 		int i = 0;
 		char *p = strtok (buf, " ");
 		char *token[3];
@@ -259,8 +262,17 @@ void handleClient(void* c) {
 	*/
 }
 
+void catch_ctrl_c_and_exit(int sig) {
+  //delete all client
+  printf("Bye\n");
+  exit(0);
+}
+
 int main (int argc, char **argv)
 {
+
+  signal(SIGINT, catch_ctrl_c_and_exit);
+
   int listenfd, connfd, n;
   pid_t childpid;
   socklen_t clilen;
