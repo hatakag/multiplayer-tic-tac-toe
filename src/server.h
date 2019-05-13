@@ -1,15 +1,14 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#define NAME_LENGTH 31
-#define IP_LENGTH 16
-#define BOARD_SIZE 3
+#include "define.h"
 
 typedef struct ClientNode {
   int sockfd;
   char ip[IP_LENGTH];
   char name[NAME_LENGTH];
   char mark;
+  int status;
   struct ClientNode* opponent;
   char board[BOARD_SIZE][BOARD_SIZE];
 } ClientNode;
@@ -20,6 +19,7 @@ ClientNode *newNode(int sockfd, char* ip) {
   strncpy(n->ip, ip, IP_LENGTH);
   strncpy(n->name, "NULL", 5);
   n->mark = ' ';
+  n->status = NONE;
   n->opponent = NULL;
   int i,j;
   for (i=0;i<BOARD_SIZE;i++) {
@@ -31,6 +31,8 @@ ClientNode *newNode(int sockfd, char* ip) {
 }
 
 void freeNode(ClientNode* n) {
+  n->mark = ' ';
+  n->status = NONE;
   n->opponent = NULL;
   free(n);
 }

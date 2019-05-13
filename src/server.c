@@ -13,20 +13,11 @@
 #include "queue.h"
 #include "server.h"
 #include "Tic-Tac-Toe_Lib.h"
+#include "define.h"
 
 #define MAXLINE 4096 /*max text line length*/
 #define SERV_PORT 3000 /*port*/
 #define LISTENQ 8 /*maximum number of client connections */
-
-#define STRING_LENGTH 31
-
-#define LOGIN "LOGIN"
-#define JOIN "JOIN"
-#define POS "POS"
-#define QUIT "QUIT"
-#define OK "OK"
-#define FAIL "FAIL"
-#define BOARD_SIZE 3
 
 Queue playerQueue;
 
@@ -54,6 +45,7 @@ void sendOKMsg(int sockfd, char* req, char* msg) {
   strcat(buf, msg);
   buf[len] = '\0';
   send(sockfd, buf, len+1, 0);
+  printf("%s\n", buf);
   free(buf);
 }
 
@@ -67,6 +59,7 @@ void sendFailMsg(int sockfd, char* req, char* msg) {
   strcat(buf, msg);
   buf[len] = '\0';
   send(sockfd, buf, len+1, 0);
+  printf("%s\n", buf);
   free(buf);
 }
 
@@ -88,12 +81,29 @@ void sendPosMsg(int sockfd, int x, int y) {
   strcat(buf, ystr);
   buf[len] = '\0';
   send(sockfd, buf, len+1, 0);
+  printf("%s\n", buf);
+  free(buf);
+}
+
+void sendEndMsg(int sockfd, int winnerfd) {
+  int wlen;
+  wlen = snprintf(NULL, 0, "%d", winnerfd);
+  char *wstr = (char*)malloc((wlen+1)*sizeof(char));
+  snprintf(wstr, wlen+1, "%d", winnerfd);
+  int len = strlen(END) + 1 + wlen;
+  char *buf = (char*)malloc(sizeof(char)*(len+1));
+  strcpy(buf, END);
+  strcat(buf, " ");
+  strcat(buf, wstr);
+  buf[len] = '\0';
+  send(sockfd, buf, len+1, 0);
+  printf("%s\n", buf);
   free(buf);
 }
 
 bool checkUsernamePassword(char* username, char* password) {
   FILE * fp = fopen("src/user.txt", "r");
-  char *name = (char*)malloc(STRING_LENGTH*sizeof(char));
+  char *name = (char*)malloc(NAME_LENGTH*sizeof(char));
   char *pass = (char*)malloc(STRING_LENGTH*sizeof(char));
   int check = 0;
   while (!feof(fp)) {
@@ -109,12 +119,17 @@ bool checkUsernamePassword(char* username, char* password) {
 }
 
 void handleLoginReq(ClientNode* clinode, char* username, char* password) {
+  if (clinode->status != NONE) {
+    sendFailMsg(clinode->sockfd, LOGIN, "login fail - cannot login at this stage, quit to login");
+    return;
+  }
   if (username == NULL || password == NULL) {
     sendFailMsg(clinode->sockfd, LOGIN, "login fail - invalid username & password");
     return;
   }
   if (checkUsernamePassword(username, password)) {
     strcpy(clinode->name, username);
+    clinode->status = LOGGED;
     printf("Send OK LOGIN msg %s %s\n", username, password);
     sendOKMsg(clinode->sockfd, LOGIN, "login successfully");
   } else {
@@ -124,7 +139,16 @@ void handleLoginReq(ClientNode* clinode, char* username, char* password) {
 }
 
 void handleJoinReq(ClientNode* clinode, Queue *playerQueue) {
+  if (clinode->status == NONE) {
+    sendFailMsg(clinode->sockfd, JOIN, "join fail - cannot join at this stage, login to join");
+    return;
+  }
+  if (clinode->status == JOINED || clinode->status == WAITING || clinode->status == MARKING) {
+    sendFailMsg(clinode->sockfd, JOIN, "join fail - already joined");
+    return;
+  }
   enQueue(clinode, playerQueue);
+  clinode->status = JOINED;
   printf("%d\n", clinode->sockfd);
   printQueue(*playerQueue);
   if (fullQueue(*playerQueue)) {
@@ -132,40 +156,65 @@ void handleJoinReq(ClientNode* clinode, Queue *playerQueue) {
     opponent->opponent = clinode;
     clinode->opponent = opponent;
     deQueue(playerQueue);
+    clinode->status = MARKING;
+    opponent->status = WAITING;
+    clinode->mark = 'X';
+    opponent->mark = 'O';
     printf("Send OK JOIN msg %d %d\n", clinode->sockfd, opponent->sockfd);
     sendOKMsg(clinode->sockfd, JOIN, "match found");
     sendOKMsg(opponent->sockfd, JOIN, "match found");
-    clinode->mark = 'X';
-    opponent->mark = 'O';
   }
 }
 
+void endMatch(ClientNode* clinode, int winnerfd) {
+  sendEndMsg(clinode->sockfd, winnerfd);
+  sendEndMsg(clinode->opponent->sockfd, winnerfd);
+  int i,j;
+    for (i=0;i<BOARD_SIZE;i++) {
+      for (j=0;j<BOARD_SIZE;j++) {
+        clinode->board[i][j] = ' ';
+        clinode->opponent->board[i][j] = ' ';
+      }
+    }
+    clinode->status = LOGGED;
+    clinode->opponent->status = LOGGED;
+    clinode->opponent->opponent = NULL;
+    clinode->opponent = NULL;
+}
+
 void handlePosReq(ClientNode* clinode,int x, int y) {
+  if (clinode->status == WAITING) {
+    sendFailMsg(clinode->sockfd, POS, "pos fail - not your turn");
+    return;
+  }
+  if (clinode->status != MARKING && clinode->status != WAITING) {
+    sendFailMsg(clinode->sockfd, POS, "pos fail - not join a game yet");
+    return;
+  }
   if (checkMarkPosition(x, y) && !isMark(clinode->board, x, y)) {
     printf("Send OK POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
     sendPosMsg(clinode->opponent->sockfd, x, y);
     sendOKMsg(clinode->sockfd, POS, "valid mark position");
     clinode->board[x][y] = clinode->mark;
     clinode->opponent->board[x][y] = clinode->mark;
+    clinode->status = WAITING;
+    clinode->opponent->status = MARKING;
   } else {
     printf("Send FAIL POS msg %d %d %d %d\n", clinode->opponent->sockfd, clinode->sockfd, x, y);
     sendFailMsg(clinode->sockfd, POS, "invalid mark position");
   }
   if (checkWin(clinode->board)==1 || checkWin(clinode->board)==-1) {
-    int i,j;
-    for (i=0;i<BOARD_SIZE;i++) {
-      for (j=0;j<BOARD_SIZE;j++) {
-	clinode->board[i][j] = ' ';
-	clinode->opponent->board[i][j] = ' ';
-      }
-    }
+    endMatch(clinode, clinode->sockfd);
   }
 }
 
 void handleQuitReq(ClientNode* clinode) {
-  //delete client data
+  if (clinode->status == MARKING || clinode->status == WAITING)
+    endMatch(clinode, clinode->opponent->sockfd);
+  if (clinode->status == JOINED)
+    deQueue(&playerQueue);
   printf("Delete data of client %d\n", clinode->sockfd);
-  free(clinode);
+  free(clinode); //delete client data
 }
 
 void handleClient(void* c) {
@@ -199,6 +248,7 @@ void handleClient(void* c) {
 		  close(clinode->sockfd);
 		} else {
 		  printf("%s\n", "Bad request");
+      sendFailMsg(clinode->sockfd, REQ, "Bad request");
 		}
     }
     /*
