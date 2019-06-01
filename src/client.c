@@ -1,7 +1,5 @@
 #include "client.h"
 
-//enum {NONE, LOGGINGIN, JOINING, MARKING, WAITING};
-
 int sockfd;
 int state = NONE;
 char username[NAME_LENGTH];
@@ -11,48 +9,49 @@ int xPos=0, yPos=0;
 
 int main(int argc, char **argv) 
 {
-	signal(SIGINT, catch_ctrl_c_and_exit);
- //int sockfd;
- struct sockaddr_in servaddr;
- char sendline[MAXLINE], recvline[MAXLINE];
+  signal(SIGINT, catch_ctrl_c_and_exit);
+  //int sockfd;
+  struct sockaddr_in servaddr;
+  char sendline[MAXLINE], recvline[MAXLINE];
 	
- //basic check of the arguments
- //additional checks can be inserted
- if (argc !=2) {
-  perror("Usage: TCPClient <IP address of the server"); 
-  exit(1);
- }
+  //basic check of the arguments
+  //additional checks can be inserted
+  if (argc !=2) {
+    perror("Usage: TCPClient <IP address of the server"); 
+    exit(1);
+  }
 	
- //Create a socket for the client
- //If sockfd<0 there was an error in the creation of the socket
- if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
-  perror("Problem in creating the socket");
-  exit(2);
- }
+  //Create a socket for the client
+  //If sockfd<0 there was an error in the creation of the socket
+  if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
+    perror("Problem in creating the socket");
+    exit(2);
+  }
 	
- //Creation of the socket
- memset(&servaddr, 0, sizeof(servaddr));
- servaddr.sin_family = AF_INET;
- servaddr.sin_addr.s_addr= inet_addr(argv[1]);
- servaddr.sin_port =  htons(SERV_PORT); //convert to big-endian order
+  //Creation of the socket
+  memset(&servaddr, 0, sizeof(servaddr));
+  servaddr.sin_family = AF_INET;
+  servaddr.sin_addr.s_addr= inet_addr(argv[1]);
+  servaddr.sin_port =  htons(SERV_PORT); //convert to big-endian order
 	
- //Connection of the client to the socket 
- if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))<0) {
-  perror("Problem in connecting to the server");
-  exit(3);
- }
+  //Connection of the client to the socket 
+  if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))<0) {
+    perror("Problem in connecting to the server");
+    exit(3);
+  }
  
   // Signal driven I/O mode and NONBlOCK mode so that recv will not block 
   if(fcntl(sockfd, F_SETFL, O_NONBLOCK | O_ASYNC))
-      printf("Error in setting socket to async, nonblock mode");  
+    printf("Error in setting socket to async, nonblock mode");  
   
   signal(SIGIO, signio_handler); // assign SIGIO to the handler
 
   //set this process to be the process owner for SIGIO signal 
   if (fcntl(sockfd, F_SETOWN, getpid()) <0)
-      printf("Error in setting own to socket");
+    printf("Error in setting own to socket");
 
   displayLoginScreen();
+  while(1) {}
   
   exit(0);
 }
@@ -83,16 +82,16 @@ void sendLoginReq(char *username, char* password) {
   strcat(buf, " ");
   strcat(buf, password);
   buf[len] = '\0';
+  state = LOGGINGIN;
   send(sockfd, buf, len+1, 0);
   printf("%s\n", buf);
   free(buf);
-  state = LOGGINGIN;
 }
 
 void sendJoinReq() {
   printf("%s\n", JOIN);
-  send(sockfd, JOIN, sizeof(JOIN), 0);
   state = JOINING;
+  send(sockfd, JOIN, sizeof(JOIN), 0);
 }
 
 void sendPosReq(int x, int y) {
@@ -127,124 +126,141 @@ void handleRes(char *res) {
   char *p = strtok (res, " ");
   char *token[3];
   while (p != NULL) {
-  	token[i++] = p;
+    token[i++] = p;
     p = strtok (NULL, " ");
   }
+  printf("%d\n", state);
   if (state == LOGGINGIN && (strcmp(token[1], LOGIN) == 0)) {
-  	if (strcmp(token[0], OK) == 0) {
-  		//display game menu
-  		displayMenuScreen();
-  		state = NONE;
-  	} else {
-  		//display error ask user to login again
-  		printf("%s\n", token[2]);
-  		printf("Press any key to login again\n");
-  		getchar();
-  		displayLoginScreen();
-  		state = NONE;
-  	}
+    if (strcmp(token[0], OK) == 0) {
+      state = LOGGED;
+      //display game menu
+      displayMenuScreen();
+    } else {
+      //display error ask user to login again
+      printf("%s\n", token[2]);
+      printf("Press any key to login again\n");
+      getchar();
+      state = NONE;
+      displayLoginScreen();
+    }
   } else if (state == JOINING && (strcmp(token[1], JOIN) == 0)) {
-  	if (strcmp(token[0], OK) == 0) {
-  		if (strcmp(token[2], "1") == 0) {
-  			state = MARKING;
-  		} else state = WAITING;
-  		//clear board
-  		clearBoard();
-  		//display board
-  		displayPlayingScreen();
-  	} else {
-  		//display error cannot join
-  		printf("%s\n", token[2]);
-  		printf("Press any key to go back to menu\n");
-  		getchar();
-  		displayMenuScreen();
-  		state = NONE;
-  	}
+    if (strcmp(token[0], OK) == 0) {
+      if (strcmp(token[2], "1") == 0) {
+	state = MARKING;
+	mark = 'X';
+      } else {
+	state = WAITING;
+	mark = 'O';
+      }
+      //clear board
+      clearBoard();
+      //display board
+      displayPlayingScreen();
+    } else {
+      //display error cannot join
+      printf("%s\n", token[2]);
+      printf("Press any key to go back to menu\n");
+      getchar();
+      state = LOGGED;
+      displayMenuScreen();
+    }
   } else if (state == MARKING && (strcmp(token[1], POS) == 0)) {
-  	if (strcmp(token[0], OK) == 0) {
-  		state = WAITING;
-  		//update board: add new mark & refresh display
-  		markAt(mark, xPos, yPos);
-  		displayPlayingScreen();
-  	} else {
-  		//display error invalid mark
-  		printf("%s\n", token[2]);
-  		printf("Press any key to re-mark\n");
-  		getchar();
-  		displayPlayingScreen();
-  	}
+    if (strcmp(token[0], OK) == 0) {
+      state = WAITING;
+      //update board: add new mark & refresh display
+      markAt(mark, xPos, yPos);
+      displayPlayingScreen();
+    } else {
+      //display error invalid mark
+      printf("%s\n", token[2]);
+      printf("Press any key to re-mark\n");
+      getchar();
+      displayPlayingScreen();
+    }
   } else if (state == WAITING && (strcmp(token[0], POS) == 0)) {
-  	state = MARKING;
-  	//update board: opponent mark
-  	char opponentMark = (mark == 'X') ? 'O' : 'X';
-  	markAt(opponentMark, xPos, yPos);
-  	displayPlayingScreen();
+    state = MARKING;
+    //update board: opponent mark
+    char opponentMark = (mark == 'X') ? 'O' : 'X';
+    markAt(opponentMark, atoi(token[1]), atoi(token[2]));
+    displayPlayingScreen();
   } else if ((state == MARKING || state == WAITING) && (strcmp(token[0], END) == 0)) {
-  	// display winner
-  	if (sockfd == atoi(token[1]))
-  		printf("\nYou win\n");
-  	else printf("\nYou lose\n");
-  	state = NONE;
+    // display winner
+    printf("%d-%d\n", sockfd, atoi(token[1]));
+    if (sockfd == atoi(token[1]))
+      printf("\nYou win\n");
+    else printf("\nYou lose\n");
+    state = LOGGED;
+    printf("Press any key to go back to menu\n");
+    getchar();
+    displayMenuScreen();
   } else {
-  	// display error - internal server error
-  	printf("Internal server error\n");
+    // display error - internal server error
+    printf("Internal server error\n");
+    sendQuitReq();
+    printf("\n____GOODBYE____\n");
+    exit(0);
   }
 
 }
 
 void displayLoginScreen() {
-	memset(username,0,sizeof(username));
-	char name[NAME_LENGTH], pass[STRING_LENGTH];
-	printf("Username: ");
-	scanf("%s", name);
-	printf("Password: ");
-	scanf("%s", pass);
-	sendLoginReq(name, pass);
-	strcpy(username, name);
+  memset(username,0,sizeof(username));
+  char name[NAME_LENGTH], pass[STRING_LENGTH];
+  printf("Username: ");
+  scanf("%s", name);
+  printf("Password: ");
+  scanf("%s", pass);
+  sendLoginReq(name, pass);
+  strcpy(username, name);
 }
 
 void displayMenuScreen() {
-	int choice;
-	do {
-		choice = 0;
-		printf("\t_____MENU_____\n\n");
-		printf("\t1.PLAY\n");
-		printf("\t2.QUIT\n");
-		printf("Select: ");scanf("%d",&choice);__fpurge(stdin);
-		switch (choice) {
-			case 1:
-				sendJoinReq();
-				break;
-			case 2:
-				sendQuitReq();
-				break;
-			default:
-				printf("Invalid selection - please select again\n");
-				break;
-		}
-	} while(choice != 2);
-	printf("\n\t____GOODBYE____\n");
+  int choice;
+  do {
+    choice = 0;
+    printf("_____MENU_____\n\n");
+    printf("1.PLAY\n");
+    printf("2.QUIT\n");
+    printf("Select: ");scanf("%d",&choice);__fpurge(stdin);
+    switch (choice) {
+    case 1:
+      sendJoinReq();
+      displayWaitingScreen();
+      break;
+    case 2:
+      sendQuitReq();
+      printf("\n____GOODBYE____\n");
+      exit(0);
+    default:
+      printf("Invalid selection - please select again\n");
+      break;
+    }
+  } while(choice != 2 && choice != 1);
 }
 
 void displayPlayingScreen() {
-	printf("\nTIC_TAC_TOE\n\n");
-	if (state == MARKING) {
-		printf("Your turn (%c)\n", mark);
-	}
-	if (state == WAITING) {
-		char opponentMark = (mark == 'X') ? 'O' : 'X';
-		printf("Opponent turn (%c)\n", opponentMark);
-	}
-	board(grid);
-	if (state == MARKING) {
-		xPos=0, yPos=0;
-		printf("Select mark position (x-y): ");
-		scanf("%d%*c%d", &xPos, &yPos);
-		sendPosReq(xPos, yPos);
-	}
-	if (state == WAITING) {
-		printf("Waiting for opponent ...\n");
-	}
+  printf("\nTIC_TAC_TOE\n\n");
+  if (state == MARKING) {
+    printf("Your turn (%c)\n\n", mark);
+  }
+  if (state == WAITING) {
+    char opponentMark = (mark == 'X') ? 'O' : 'X';
+    printf("Opponent turn (%c)\n\n", opponentMark);
+  }
+  board(grid);
+  if (state == MARKING) {
+    xPos=0, yPos=0;
+    printf("\nSelect mark position (x-y): ");
+    scanf("%d%*c%d", &xPos, &yPos);
+    sendPosReq(xPos, yPos);
+  }
+  if (state == WAITING) {
+    printf("\nWaiting for opponent ...\n");
+  }
+}
+
+void displayWaitingScreen() {
+  printf("Waiting for other player ...\n");
 }
 
 void clearBoard() {
@@ -257,5 +273,5 @@ void clearBoard() {
 }
 
 void markAt(char m, int x, int y) {
-	grid[x][y] = m;
+  grid[x][y] = m;
 }

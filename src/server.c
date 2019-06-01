@@ -161,8 +161,8 @@ void handleJoinReq(ClientNode* clinode, Queue *playerQueue) {
     clinode->mark = 'X';
     opponent->mark = 'O';
     //printf("Send OK JOIN msg %d %d\n", clinode->sockfd, opponent->sockfd);
-    sendOKMsg(clinode->sockfd, JOIN, "1");
-    sendOKMsg(opponent->sockfd, JOIN, "2");
+    sendOKMsg(clinode->sockfd, JOIN, "2");
+    sendOKMsg(opponent->sockfd, JOIN, "1");
   }
 }
 
