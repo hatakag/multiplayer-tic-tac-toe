@@ -17,11 +17,13 @@
 #define END "END"
 #define REQ "REQ"
 
-//client status
+//client status & state
 #define NONE 0
 #define LOGGED 1
-#define JOINED 2
-#define WAITING 3
-#define MARKING 4
+#define LOGGINGIN 2
+#define JOINED 3
+#define JOINING 4
+#define WAITING 5
+#define MARKING 6
 
 #endif
