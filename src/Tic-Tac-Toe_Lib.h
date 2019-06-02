@@ -8,7 +8,7 @@
 // print board
 void board(char square[][3]);
 
-// checkWin return 1 if one wins, return -1 if draw, return if unfinish
+// checkWin return 1 if X wins, 2 if O wins, return -1 if draw, return 0 if unfinish
 int checkWin(char square[][3]);
 
 // write player steps to file

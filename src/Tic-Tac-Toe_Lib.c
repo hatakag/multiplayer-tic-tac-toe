@@ -19,15 +19,31 @@ void board(char square[][3])
   printf("     |     |     \n");
 }
 
-// checkWin return 1 if one wins, return -1 if draw, return if unfinish
+// checkWin return 1 if X wins, 2 if O wins, return -1 if draw, return if unfinish
 int checkWin(char square[][3]) {
   int i;
   for (i = 0; i < 3; i++) {
-    if (square[i][0] != ' ' && square[i][0] == square[i][1] && square[i][0] == square[i][2]) return 1;
-    if (square[0][i] != ' ' && square[0][i] == square[1][i] && square[0][i] == square[2][i]) return 1;
+    if (square[i][0] != ' ' && square[i][0] == square[i][1] && square[i][0] == square[i][2]) {
+      if (square[i][0] == 'X')
+	return 1;
+      else return 2;
+    }    
+    if (square[0][i] != ' ' && square[0][i] == square[1][i] && square[0][i] == square[2][i]) {
+      if (square[i][0] == 'X')
+	return 1;
+      else return 2;
+    }
   }
-  if (square[0][0] != ' ' && square[0][0] == square[1][1] && square[0][0] == square[2][2]) return 1;
-  if (square[2][0] != ' ' && square[2][0] == square[1][1] && square[2][0] == square[0][2]) return 1;
+  if (square[0][0] != ' ' && square[0][0] == square[1][1] && square[0][0] == square[2][2]) {
+    if (square[0][0] == 'X')
+      return 1;
+    else return 2;
+  }
+  if (square[2][0] != ' ' && square[2][0] == square[1][1] && square[2][0] == square[0][2]) {
+    if (square[2][0] == 'X')
+      return 1;
+    else return 2;
+  }
   int isDraw = 1;
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
