@@ -5,11 +5,11 @@ SRC=src
 
 all: server.out client.out test_client.out
 server.out: server.o Tic-Tac-Toe_Lib.o
-	$(CC) $(CFLAGS) $(LIBS) -o server.out server.o Tic-Tac-Toe_Lib.o
+	$(CC) $(CFLAGS) -o server.out server.o Tic-Tac-Toe_Lib.o $(LIBS)
 client.out: client.o
-	$(CC) $(CFLAGS) $(LIBS) -o client.out client.o Tic-Tac-Toe_Lib.o
+	$(CC) $(CFLAGS) -o client.out client.o Tic-Tac-Toe_Lib.o $(LIBS)
 test_client.out: test_client.o
-	$(CC) $(CFLAGS) $(LIBS) -o test_client.out test_client.o
+	$(CC) $(CFLAGS) -o test_client.out test_client.o $(LIBS)
 server.o: $(SRC)/server.c
 	$(CC) $(CFLAGS) -c $(SRC)/server.c
 Tic-Tac-Toe_Lib.o: $(SRC)/Tic-Tac-Toe_Lib.c

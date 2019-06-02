@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 
   displayLoginScreen();
   while(1) {}
-  
+  //pause();
   exit(0);
 }
 
