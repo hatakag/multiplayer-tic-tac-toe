@@ -136,7 +136,7 @@ void handleRes(char *res) {
     token[i++] = p;
     p = strtok (NULL, " ");
   }
-  printf("%d %s-%s\n", state, token[0], token[1]);
+  //printf("%d %s-%s\n", state, token[0], token[1]);
   do {  //need do while to break from if-else in case state changing
     if (state == LOGGINGIN && (strcmp(token[1], LOGIN) == 0)) {
       if (strcmp(token[0], OK) == 0) {
@@ -205,17 +205,10 @@ void handleRes(char *res) {
       // display winner if disconnect
       if (checkWin(grid) == 0) {
 	printf("\nOther player is disconnected\n");
-	if (atoi(token[1]) == -1)
-	  printf("\nDRAW\n");
-	else if (turn == atoi(token[1]))
-	  printf("\nYOU WIN\n");
-	else printf("\nYOU LOSE\n");
-	printf("\nPress enter to go back to menu\n");
-	while(1) {if (getchar()=='\n'&&getchar()=='\n') break;}
-	displayMenuScreen();
+	displayWinnerScreen(atoi(token[1]));
 	break;
       } else {
-	displayWinnerScreen();
+	displayWinnerScreen(atoi(token[1]));
 	break;
       }
     } else {
@@ -293,15 +286,13 @@ void displayPlayingScreen() {
     }
   } else {
     printf("\nMATCH END\n");
-    //printf("\nPress enter to see the winner\n");
-    //while(1) {if (getchar()=='\n'&&getchar()=='\n') break;}
   }
 }
 
-void displayWinnerScreen() {
-  if (checkWin(grid) == -1)
+void displayWinnerScreen(int winner) {
+  if (winner == -1)
     printf("\nDRAW\n");
-  else if (checkWin(grid) == turn)
+  else if (winner == turn)
     printf("\nYOU WIN\n");
   else printf("\nYOU LOSE\n");
   printf("\nPress enter to go back to menu\n");
