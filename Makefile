@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -std=gnu99 -O0
+CFLAGS=-Wall -std=gnu99
 LIBS=-pthread
 SRC=src
 

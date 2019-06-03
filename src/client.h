@@ -31,6 +31,7 @@ void sendQuitReq();
 void handleRes(char *res);
 void displayLoginScreen();
 void displayMenuScreen();
+void displayWinnerScreen();
 void displayPlayingScreen();
 void clearBoard();
 void markAt(char m, int x, int y);

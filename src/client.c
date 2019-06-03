@@ -1,11 +1,11 @@
 #include "client.h"
 
 int sockfd;
-int state = NONE;
+volatile int state = NONE;
 char *username, *name, *pass;
 char grid[BOARD_SIZE][BOARD_SIZE];
 char mark;
-int turn;
+int turn=0;
 int xPos=0, yPos=0;
 
 int main(int argc, char **argv) 
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 
   displayLoginScreen();
   while(1) {
-    sleep(100);
+    sleep(1);
   }
   //pause();
   exit(0);
@@ -70,10 +70,14 @@ void signio_handler(int signo)
 }
 
 void catch_ctrl_c_and_exit(int sig) {
-  send(sockfd, QUIT, sizeof(QUIT), 0);
-  printf("__Bye__\n");
-  close(sockfd);
-  exit(0);
+  if (state==WAITING || state==MARKING) {
+    printf("\nCannot quit at this stage - finish the match\n");
+  } else {
+    send(sockfd, QUIT, sizeof(QUIT), 0);
+    printf("__Bye__\n");
+    close(sockfd);
+    exit(0);
+  }
 }
 
 void sendLoginReq(char *username, char* password) {
@@ -132,7 +136,7 @@ void handleRes(char *res) {
     token[i++] = p;
     p = strtok (NULL, " ");
   }
-  //printf("%d\n", state);
+  printf("%d %s-%s\n", state, token[0], token[1]);
   do {  //need do while to break from if-else in case state changing
     if (state == LOGGINGIN && (strcmp(token[1], LOGIN) == 0)) {
       if (strcmp(token[0], OK) == 0) {
@@ -197,20 +201,23 @@ void handleRes(char *res) {
       displayPlayingScreen();
       break;
     } else if ((state == MARKING || state == WAITING) && (strcmp(token[0], END) == 0)) {
+      state = LOGGED;
       // display winner if disconnect
       if (checkWin(grid) == 0) {
 	printf("\nOther player is disconnected\n");
 	if (atoi(token[1]) == -1)
-	  printf("\nDraw\n");
+	  printf("\nDRAW\n");
 	else if (turn == atoi(token[1]))
-	  printf("\nYou win\n");
-	else printf("\nYou lose\n");
-	state = LOGGED;
-	printf("Press enter to go back to menu\n");
+	  printf("\nYOU WIN\n");
+	else printf("\nYOU LOSE\n");
+	printf("\nPress enter to go back to menu\n");
 	while(1) {if (getchar()=='\n'&&getchar()=='\n') break;}
 	displayMenuScreen();
+	break;
+      } else {
+	displayWinnerScreen();
+	break;
       }
-      break;
     } else {
       // display error - internal server error
       printf("Internal server error\n");
@@ -284,17 +291,22 @@ void displayPlayingScreen() {
     if (state == WAITING) {
       printf("\nWaiting for opponent ...\n");
     }
-  } else {  
-    if (checkWin(grid) == -1)
-      printf("\nDraw\n");
-    else if (checkWin(grid) == turn)
-      printf("\nYou win\n");
-    else printf("\nYou lose\n");
-    state = LOGGED;
-    printf("Press enter to go back to menu\n");
-    while(1) {if (getchar()=='\n'&&getchar()=='\n') break;}
-    displayMenuScreen();
+  } else {
+    printf("\nMATCH END\n");
+    //printf("\nPress enter to see the winner\n");
+    //while(1) {if (getchar()=='\n'&&getchar()=='\n') break;}
   }
+}
+
+void displayWinnerScreen() {
+  if (checkWin(grid) == -1)
+    printf("\nDRAW\n");
+  else if (checkWin(grid) == turn)
+    printf("\nYOU WIN\n");
+  else printf("\nYOU LOSE\n");
+  printf("\nPress enter to go back to menu\n");
+  while(1) {if (getchar()=='\n'&&getchar()=='\n') break;}
+  displayMenuScreen();
 }
 
 void displayWaitingScreen() {

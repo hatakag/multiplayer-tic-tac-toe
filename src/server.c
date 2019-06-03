@@ -204,6 +204,7 @@ void handlePosReq(ClientNode* clinode,int x, int y) {
     sendFailMsg(clinode->sockfd, POS, "Pos_fail---Invalid_mark_position");
   }
   if (checkWin(clinode->board) != 0) {
+    sleep(1);
     endMatch(clinode, checkWin(clinode->board));
   }
 }
