@@ -11,5 +11,11 @@
 ```
 make
 ```
-### Run server: ```./server.out```
-### Run client: ```./client.out 127.0.0.1```
+### Run server: 
+```
+./server.out
+```
+### Run client: 
+```
+./client.out 127.0.0.1
+```
